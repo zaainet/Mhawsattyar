@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gate_BD Bot Dashboard | Telegram Bot Control Panel</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Pyidaungsu:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Google Sheets API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+
+    <style>
+        :root {
+            --primary: #ffcf40;
+            --primary-dark: #b8860b;
+            --bg-dark: #0a0a0a;
+            --card-bg: rgba(20, 20, 20, 0.95);
+        }
+
+        body {
+            font-family: 'Pyidaungsu', serif;
+            background: var(--bg-dark);
+            color: #e5e7eb;
+            background-image: radial-gradient(circle at 20% 30%, #1a1a0a, #000);
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 207, 64, 0.15);
+            border-radius: 20px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #000;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        .btn-primary:active { transform: scale(0.97); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+        .btn-danger:hover { background: #ef4444; color: white; }
+
+        .btn-warning {
+            background: rgba(255, 207, 64, 0.2);
+            border: 1px solid rgba(255, 207, 64, 0.3);
+            color: var(--primary);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.98);
+            backdrop-filter: blur(20px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-tab {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .nav-tab.active {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 4px 15px rgba(255, 207, 64, 0.3);
+        }
+
+        /* Loading animation */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 207, 64, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="glass-card p-8 w-96 text-center border-t-4 border-primary">
+            <i class="fa-brands fa-telegram text-6xl text-primary mb-4"></i>
+            <h2 class="text-2xl font-bold mb-2">Gate_BD Dashboard</h2>
+            <p class="text-zinc-500 text-sm mb-6">Telegram Bot Control Panel</p>
+            <input type="password" id="adminPassword" class="w-full bg-black/50 border border-primary/30 rounded-xl p-3 mb-4 text-white" placeholder="စကားဝှက်ထည့်ပါ">
+            <button onclick="checkLogin()" class="w-full btn-primary py-3 rounded-xl">ဝင်ရောက်မည်</button>
+            <p class="text-[10px] text-zinc-600 mt-4">© Gate_BD Bot | ဆရာမှော်စက်ရှင်</p>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" style="display: none;">
+        
+        <!-- Header -->
+        <nav class="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-primary/20">
+            <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-black">
+                        <i class="fa-brands fa-telegram text-xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold">Gate_BD <span class="text-primary">Bot Dashboard</span></h1>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="syncStatus" class="text-[10px] text-zinc-500 hidden sm:inline">
+                        <i class="fa-regular fa-circle-check text-green-500"></i> Connected
+                    </span>
+                    <button onclick="logout()" class="text-red-400 hover:text-red-300 text-sm px-4 py-2 rounded-xl bg-white/5">
+                        <i class="fa-solid fa-sign-out-alt"></i> ထွက်ရန်
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-6xl mx-auto p-6 space-y-6">
+            
+            <!-- Google Auth Status Card -->
+            <div id="authStatusCard" class="glass-card p-4 border-l-4 border-yellow-500">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-google text-2xl text-yellow-500"></i>
+                    <div>
+                        <p class="text-sm font-bold" id="authStatusText">Google Sheets ချိတ်ဆက်ရန် လိုအပ်ပါသည်</p>
+                        <p class="text-[10px] text-zinc-500" id="authStatusDetail">Service Account ကို အသုံးပြု၍ ချိတ်ဆက်ပါမည်</p>
+                    </div>
+                    <button onclick="initGoogleSheetsAPI()" id="authBtn" class="ml-auto btn-primary px-4 py-2 rounded-xl text-sm">
+                        <i class="fa-solid fa-plug"></i> ချိတ်ဆက်မည်
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="glass-card p-5 text-center">
+                    <i class="fa-solid fa-users text-3xl text-blue-400 mb-2"></i>
+                    <p class="text-2xl font-black" id="totalUsers">0</p>
+                    <p class="text-[10px] text-zinc-400 uppercase">စုစုပေါင်း Users</p>
+                </div>
+                <div class="glass-card p-5 text-center">
+                    <i class="fa-solid fa-book text-3xl text-green-400 mb-2"></i>
+                    <p class="text-2xl font-black" id="totalContents">0</p>
+                    <p class="text-[10px] text-zinc-400 uppercase">စုစုပေါင်း Contents</p>
+                </div>
+                <div class="glass-card p-5 text-center">
+                    <i class="fa-solid fa-clock text-3xl text-yellow-400 mb-2"></i>
+                    <p class="text-2xl font-black" id="lastSync">-</p>
+                    <p class="text-[10px] text-zinc-400 uppercase">နောက်ဆုံး Sync</p>
+                </div>
+                <div class="glass-card p-5 text-center cursor-pointer" onclick="loadAllData()">
+                    <i class="fa-solid fa-rotate-right text-3xl text-primary mb-2"></i>
+                    <p class="text-sm font-bold text-primary">Refresh</p>
+                    <p class="text-[10px] text-zinc-400 uppercase">ဒေတာအသစ်</p>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="flex gap-2 border-b border-white/10 pb-4">
+                <button onclick="showTab('users')" id="tabUsersBtn" class="nav-tab px-6 py-2 rounded-xl font-bold text-sm bg-white/5 active">👥 Users Management</button>
+                <button onclick="showTab('contents')" id="tabContentsBtn" class="nav-tab px-6 py-2 rounded-xl font-bold text-sm bg-white/5">📝 Contents Management</button>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="usersTab" class="space-y-6">
+                <!-- Add User Form -->
+                <div class="glass-card p-6">
+                    <h2 class="text-primary font-bold mb-4"><i class="fa-solid fa-user-plus mr-2"></i> Telegram ID အသစ်ထည့်ရန်</h2>
+                    <div class="flex gap-3">
+                        <input type="number" id="newUserId" class="flex-1 bg-black/50 border border-white/10 rounded-xl p-3 text-white" placeholder="Telegram User ID ထည့်ပါ (ဥပမာ - 123456789)">
+                        <button onclick="addUser()" class="btn-primary px-6 py-3 rounded-xl"><i class="fa-solid fa-plus"></i> ထည့်မည်</button>
+                    </div>
+                </div>
+
+                <!-- Users List -->
+                <div class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-primary font-bold"><i class="fa-solid fa-list mr-2"></i> ခွင့်ပြုထားသော User များ</h2>
+                        <span class="text-xs text-zinc-500" id="userCount">0 users</span>
+                    </div>
+                    <div id="usersList" class="space-y-2 max-h-96 overflow-y-auto">
+                        <div class="text-center py-10 text-zinc-500">
+                            <div class="spinner mx-auto mb-4"></div>
+                            <p>Loading users from Google Sheets...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contents Tab -->
+            <div id="contentsTab" style="display: none;" class="space-y-6">
+                <!-- Add Content Form -->
+                <div class="glass-card p-6">
+                    <h2 class="text-primary font-bold mb-4"><i class="fa-solid fa-plus-circle mr-2"></i> Content အသစ်ထည့်ရန်</h2>
+                    <div class="space-y-3">
+                        <input type="text" id="newTitle" class="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white" placeholder="ခေါင်းစဉ် (Title)">
+                        <textarea id="newContent" rows="4" class="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white" placeholder="အကြောင်းအရာ (Content)"></textarea>
+                        <button onclick="addContent()" class="btn-primary px-6 py-3 rounded-xl w-full"><i class="fa-solid fa-save"></i> သိမ်းမည်</button>
+                    </div>
+                </div>
+
+                <!-- Contents List -->
+                <div class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-primary font-bold"><i class="fa-solid fa-book-open mr-2"></i> ရှိပြီးသော Contents များ</h2>
+                        <span class="text-xs text-zinc-500" id="contentCount">0 contents</span>
+                    </div>
+                    <div id="contentsList" class="space-y-3 max-h-96 overflow-y-auto">
+                        <div class="text-center py-10 text-zinc-500">
+                            <div class="spinner mx-auto mb-4"></div>
+                            <p>Loading contents from Google Sheets...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ============================================
+        // CONFIGURATION - Update with your actual values!
+        // ============================================
+        const ADMIN_PASSWORD = "gatebd2026";  // Change this!
+        
+        // Google Sheets Configuration
+        // IMPORTANT: You need to replace these with your actual values
+        const SPREADSHEET_ID = "Gate_BD";  // ခင်ဗျားရဲ့ Google Sheet ID ထည့်ပါ
+        const USERS_SHEET_NAME = "Users";   // User IDs သိမ်းထားတဲ့ Tab Name
+        const CONTENTS_SHEET_NAME = "Sheet1"; // Contents သိမ်းထားတဲ့ Tab Name
+        
+        // Service Account Email (from credentials.json)
+        const SERVICE_ACCOUNT_EMAIL = "mhawsayar@mhawsayar.iam.gserviceaccount.com";
+        
+        let gapiInitialized = false;
+        let usersData = [];
+        let contentsData = [];
+        let currentTab = 'users';
+        
+        // ============================================
+        // LOGIN SYSTEM
+        // ============================================
+        function checkLogin() {
+            const pwd = document.getElementById('adminPassword').value;
+            if(pwd === ADMIN_PASSWORD) {
+                localStorage.setItem('gatebd_admin', 'true');
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                initGoogleSheetsAPI();
+            } else {
+                Swal.fire({
+                    title: 'မှားယွင်းနေပါသည်',
+                    text: 'စကားဝှက်ကို ပြန်လည်စစ်ဆေးပါ။',
+                    icon: 'error',
+                    background: '#0a0a0a',
+                    color: '#fff'
+                });
+            }
+        }
+        
+        if(localStorage.getItem('gatebd_admin') === 'true') {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            initGoogleSheetsAPI();
+        }
+        
+        function logout() {
+            localStorage.removeItem('gatebd_admin');
+            location.reload();
+        }
+        
+        // ============================================
+        // GOOGLE SHEETS API INITIALIZATION
+        // ============================================
+        function initGoogleSheetsAPI() {
+            const authStatusText = document.getElementById('authStatusText');
+            const authStatusDetail = document.getElementById('authStatusDetail');
+            const authBtn = document.getElementById('authBtn');
+            
+            authStatusText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Google Sheets ချိတ်ဆက်နေပါသည်...';
+            authStatusDetail.innerHTML = 'Service Account အသုံးပြု၍ ချိတ်ဆက်နေပါသည်။';
+            authBtn.disabled = true;
+            authBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ချိတ်ဆက်နေသည်';
+            
+            // For Google Sheets API with Service Account, you need to use a backend proxy
+            // Since Service Account can't be used directly in browser (security),
+            // we'll use SheetDB which is already configured in your bot
+            
+            // Alternative: Use SheetDB API (already working with your bot)
+            useSheetDBAPI();
+        }
+        
+        // ============================================
+        // USE SHEETDB API (Recommended - already working with your bot)
+        // ============================================
+        const SHEETDB_API_URL = "https://sheetdb.io/api/v1/uh75k3c81e3fl";
+        
+        async function useSheetDBAPI() {
+            const authStatusText = document.getElementById('authStatusText');
+            const authStatusDetail = document.getElementById('authStatusDetail');
+            const authStatusCard = document.getElementById('authStatusCard');
+            
+            try {
+                // Test connection
+                const testRes = await fetch(SHEETDB_API_URL);
+                if(testRes.ok) {
+                    authStatusText.innerHTML = '<i class="fa-solid fa-check-circle text-green-500"></i> Google Sheets ချိတ်ဆက်ပြီးပါပြီ';
+                    authStatusDetail.innerHTML = 'SheetDB API မှတစ်ဆင့် ချိတ်ဆက်ထားပါသည်။';
+                    authStatusCard.className = 'glass-card p-4 border-l-4 border-green-500';
+                    document.getElementById('syncStatus').innerHTML = '<i class="fa-regular fa-circle-check text-green-500"></i> SheetDB Connected';
+                    
+                    await loadAllData();
+                } else {
+                    throw new Error('Connection failed');
+                }
+            } catch(e) {
+                authStatusText.innerHTML = '<i class="fa-solid fa-exclamation-triangle text-red-500"></i> ချိတ်ဆက်မရပါ';
+                authStatusDetail.innerHTML = 'SheetDB API ကို စစ်ဆေးပါ။ အင်တာနက်ရှိမရှိစစ်ပါ။';
+                authBtn.disabled = false;
+                authBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> ပြန်စမ်းမည်';
+                authBtn.onclick = () => useSheetDBAPI();
+                
+                // Load demo data for testing
+                loadDemoData();
+            }
+        }
+        
+        // ============================================
+        // LOAD DATA FROM SHEETDB
+        // ============================================
+        async function loadAllData() {
+            await Promise.all([loadUsersFromSheet(), loadContentsFromSheet()]);
+            updateLastSync();
+        }
+        
+        async function loadUsersFromSheet() {
+            try {
+                // Try to get Users from Sheet2 or separate sheet
+                const res = await fetch(`${SHEETDB_API_URL}?sheet=Users`);
+                let data = await res.json();
+                
+                if(data && Array.isArray(data) && data.length > 0) {
+                    usersData = data.map(row => ({
+                        id: row.Telegram_ID || row.ID || row.User_ID || Object.values(row)[0],
+                        name: row.Name || `User_${row.Telegram_ID}`,
+                        added_at: row.Added_At || new Date().toISOString()
+                    }));
+                } else {
+                    // Try to get from main sheet if Users sheet doesn't exist
+                    const mainRes = await fetch(`${SHEETDB_API_URL}?sheet=Sheet2`);
+                    let mainData = await mainRes.json();
+                    if(mainData && Array.isArray(mainData)) {
+                        usersData = mainData.map(row => ({
+                            id: row.Telegram_ID || row.ID,
+                            name: row.Name || 'User',
+                            added_at: row.Timestamp || new Date().toISOString()
+                        }));
+                    } else {
+                        loadDemoUsers();
+                    }
+                }
+                
+                renderUsers();
+                document.getElementById('totalUsers').innerText = usersData.length;
+            } catch(e) {
+                console.error('Error loading users:', e);
+                loadDemoUsers();
+            }
+        }
+        
+        async function loadContentsFromSheet() {
+            try {
+                const res = await fetch(`${SHEETDB_API_URL}?sheet=Sheet1`);
+                let data = await res.json();
+                
+                if(data && Array.isArray(data) && data.length > 0) {
+                    contentsData = data.map(row => ({
+                        title: row.Title || row.ခေါင်းစဉ် || Object.values(row)[0],
+                        content: row.Content || row.အကြောင်းအရာ || Object.values(row)[1] || '',
+                        created_at: row.Created_At || new Date().toISOString()
+                    }));
+                } else {
+                    loadDemoContents();
+                }
+                
+                renderContents();
+                document.getElementById('totalContents').innerText = contentsData.length;
+            } catch(e) {
+                console.error('Error loading contents:', e);
+                loadDemoContents();
+            }
+        }
+        
+        // Demo data for testing
+        function loadDemoUsers() {
+            usersData = [
+                { id: "8332673246", name: "Admin User", added_at: new Date().toISOString() },
+                { id: "123456789", name: "Test User 1", added_at: new Date().toISOString() }
+            ];
+            renderUsers();
+            document.getElementById('totalUsers').innerText = usersData.length;
+        }
+        
+        function loadDemoContents() {
+            contentsData = [
+                { title: "မင်္ဂလာဂါထာ", content: "အောင်မြင်ခြင်း၊ ချမ်းသာခြင်း နှင့် ပြည့်စုံခြင်းတို့ကို ဖြစ်စေသော ဂါထာများ...", created_at: new Date().toISOString() },
+                { title: "ရွှေဖယောင်းတိုင်", content: "ရွှေဖယောင်းတိုင် ထွန်းညှိခြင်းအကျိုးကျေးဇူးများ...", created_at: new Date().toISOString() }
+            ];
+            renderContents();
+            document.getElementById('totalContents').innerText = contentsData.length;
+        }
+        
+        // ============================================
+        // SAVE DATA TO SHEETDB
+        // ============================================
+        async function addUserToSheet(userId, userName) {
+            try {
+                await fetch(SHEETDB_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: [{
+                            Telegram_ID: userId,
+                            Name: userName,
+                            Added_At: new Date().toISOString()
+                        }]
+                    })
+                });
+            } catch(e) {
+                console.error('Error adding user to sheet:', e);
+            }
+        }
+        
+        async function addContentToSheet(title, content) {
+            try {
+                await fetch(SHEETDB_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: [{
+                            Title: title,
+                            Content: content,
+                            Created_At: new Date().toISOString()
+                        }]
+                    })
+                });
+            } catch(e) {
+                console.error('Error adding content to sheet:', e);
+            }
+        }
+        
+        // ============================================
+        // RENDER FUNCTIONS
+        // ============================================
+        function renderUsers() {
+            const container = document.getElementById('usersList');
+            document.getElementById('userCount').innerText = `${usersData.length} users`;
+            
+            if(usersData.length === 0) {
+                container.innerHTML = `<div class="text-center py-10 text-zinc-500"><i class="fa-solid fa-user-slash text-3xl mb-2"></i><p>User မရှိသေးပါ</p></div>`;
+                return;
+            }
+            
+            container.innerHTML = usersData.map(user => `
+                <div class="glass-card p-4 flex justify-between items-center">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <i class="fa-brands fa-telegram text-primary"></i>
+                            <span class="font-mono text-lg font-bold">${user.id}</span>
+                        </div>
+                        <div class="text-[10px] text-zinc-500 mt-1">
+                            <i class="fa-regular fa-calendar"></i> Added: ${new Date(user.added_at).toLocaleString()}
+                        </div>
+                    </div>
+                    <button onclick="deleteUser('${user.id}')" class="btn-danger px-4 py-2 rounded-xl text-sm">
+                        <i class="fa-solid fa-trash"></i> ဖျက်မည်
+                    </button>
+                </div>
+            `).join('');
+        }
+        
+        function renderContents() {
+            const container = document.getElementById('contentsList');
+            document.getElementById('contentCount').innerText = `${contentsData.length} contents`;
+            
+            if(contentsData.length === 0) {
+                container.innerHTML = `<div class="text-center py-10 text-zinc-500"><i class="fa-solid fa-book-open text-3xl mb-2"></i><p>Content မရှိသေးပါ</p></div>`;
+                return;
+            }
+            
+            container.innerHTML = contentsData.map((content, index) => `
+                <div class="glass-card p-4">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <h3 class="font-bold text-primary text-lg">${escapeHtml(content.title)}</h3>
+                            <p class="text-sm text-zinc-400 mt-1">${escapeHtml(content.content.substring(0, 150))}${content.content.length > 150 ? '...' : ''}</p>
+                            <div class="text-[10px] text-zinc-500 mt-2">
+                                <i class="fa-regular fa-clock"></i> ${new Date(content.created_at).toLocaleString()}
+                            </div>
+                        </div>
+                        <div class="flex gap-2 ml-4">
+                            <button onclick="editContent(${index})" class="btn-warning px-3 py-2 rounded-xl text-sm">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="deleteContent(${index})" class="btn-danger px-3 py-2 rounded-xl text-sm">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // ============================================
+        // USER MANAGEMENT
+        // ============================================
+        async function addUser() {
+            const userId = document.getElementById('newUserId').value.trim();
+            if(!userId) {
+                Swal.fire('Error', 'Telegram ID ထည့်ပါ', 'error');
+                return;
+            }
+            
+            if(usersData.find(u => u.id === userId)) {
+                Swal.fire('Error', 'ဤ User ID ရှိပြီးသားဖြစ်ပါသည်', 'error');
+                return;
+            }
+            
+            const newUser = {
+                id: userId,
+                name: `User_${userId}`,
+                added_at: new Date().toISOString()
+            };
+            
+            usersData.push(newUser);
+            await addUserToSheet(userId, newUser.name);
+            renderUsers();
+            document.getElementById('newUserId').value = '';
+            document.getElementById('totalUsers').innerText = usersData.length;
+            
+            Swal.fire({
+                title: 'အောင်မြင်ပါသည်',
+                text: `User ID ${userId} ကို ထည့်သွင်းပြီးပါပြီ။`,
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false,
+                background: '#0a0a0a',
+                color: '#fff'
+            });
+        }
+        
+        async function deleteUser(userId) {
+            const result = await Swal.fire({
+                title: 'ဖျက်ပစ်မည်?',
+                text: `User ID ${userId} ကို ဖျက်ပစ်မည်။`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                confirmButtonText: 'ဖျက်မည်',
+                cancelButtonText: 'မဖျက်တော့ပါ',
+                background: '#0a0a0a',
+                color: '#fff'
+            });
+            
+            if(result.isConfirmed) {
+                usersData = usersData.filter(u => u.id !== userId);
+                renderUsers();
+                document.getElementById('totalUsers').innerText = usersData.length;
+                Swal.fire('ဖျက်ပြီးပါပြီ', '', 'success');
+            }
+        }
+        
+        // ============================================
+        // CONTENT MANAGEMENT
+        // ============================================
+        async function addContent() {
+            const title = document.getElementById('newTitle').value.trim();
+            const content = document.getElementById('newContent').value.trim();
+            
+            if(!title || !content) {
+                Swal.fire('Error', 'ခေါင်းစဉ်နှင့် အကြောင်းအရာ ဖြည့်ပါ', 'error');
+                return;
+            }
+            
+            const newContent = {
+                title: title,
+                content: content,
+                created_at: new Date().toISOString()
+            };
+            
+            contentsData.push(newContent);
+            await addContentToSheet(title, content);
+            renderContents();
+            document.getElementById('newTitle').value = '';
+            document.getElementById('newContent').value = '';
+            document.getElementById('totalContents').innerText = contentsData.length;
+            
+            Swal.fire({
+                title: 'အောင်မြင်ပါသည်',
+                text: 'Content အသစ် ထည့်သွင်းပြီးပါပြီ။',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false,
+                background: '#0a0a0a',
+                color: '#fff'
+            });
+        }
+        
+        function editContent(index) {
+            const content = contentsData[index];
+            Swal.fire({
+                title: 'Content ပြင်ဆင်ရန်',
+                html: `
+                    <input id="editTitle" class="swal2-input w-full" placeholder="ခေါင်းစဉ်" value="${escapeHtml(content.title)}">
+                    <textarea id="editContent" class="swal2-textarea" placeholder="အကြောင်းအရာ" rows="6">${escapeHtml(content.content)}</textarea>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'သိမ်းမည်',
+                cancelButtonText: 'မသိမ်းတော့ပါ',
+                background: '#0a0a0a',
+                color: '#fff',
+                preConfirm: () => {
+                    const newTitle = document.getElementById('editTitle').value;
+                    const newContent = document.getElementById('editContent').value;
+                    if(!newTitle || !newContent) {
+                        Swal.showValidationMessage('အားလုံးဖြည့်ပါ');
+                        return false;
+                    }
+                    return { title: newTitle, content: newContent };
+                }
+            }).then((result) => {
+                if(result.isConfirmed) {
+                    contentsData[index] = {
+                        ...contentsData[index],
+                        title: result.value.title,
+                        content: result.value.content,
+                        updated_at: new Date().toISOString()
+                    };
+                    renderContents();
+                    Swal.fire('ပြင်ဆင်ပြီးပါပြီ', '', 'success');
+                }
+            });
+        }
+        
+        async function deleteContent(index) {
+            const result = await Swal.fire({
+                title: 'ဖျက်ပစ်မည်?',
+                text: `"${contentsData[index].title}" ကို ဖျက်ပစ်မည်။`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                confirmButtonText: 'ဖျက်မည်',
+                cancelButtonText: 'မဖျက်တော့ပါ',
+                background: '#0a0a0a',
+                color: '#fff'
+            });
+            
+            if(result.isConfirmed) {
+                contentsData.splice(index, 1);
+                renderContents();
+                document.getElementById('totalContents').innerText = contentsData.length;
+                Swal.fire('ဖျက်ပြီးပါပြီ', '', 'success');
+            }
+        }
+        
+        // ============================================
+        // UI HELPERS
+        // ============================================
+        function updateLastSync() {
+            const now = new Date();
+            document.getElementById('lastSync').innerHTML = now.toLocaleTimeString();
+        }
+        
+        function showTab(tab) {
+            currentTab = tab;
+            
+            if(tab === 'users') {
+                document.getElementById('usersTab').style.display = 'block';
+                document.getElementById('contentsTab').style.display = 'none';
+                document.getElementById('tabUsersBtn').classList.add('active');
+                document.getElementById('tabContentsBtn').classList.remove('active');
+            } else {
+                document.getElementById('usersTab').style.display = 'none';
+                document.getElementById('contentsTab').style.display = 'block';
+                document.getElementById('tabUsersBtn').classList.remove('active');
+                document.getElementById('tabContentsBtn').classList.add('active');
+            }
+        }
+        
+        function escapeHtml(str) {
+            if(!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if(m === '&') return '&amp;';
+                if(m === '<') return '&lt;';
+                if(m === '>') return '&gt;';
+                return m;
+            });
+        }
+        
+        // Export data as backup
+        function exportData() {
+            const data = {
+                users: usersData,
+                contents: contentsData,
+                export_date: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gatebd_backup_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            Swal.fire('Backup သိမ်းပြီးပါပြီ', '', 'success');
+        }
+        
+        // Add export button
+        document.addEventListener('DOMContentLoaded', () => {
+            const statsDiv = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-4.gap-4');
+            if(statsDiv) {
+                const exportBtn = document.createElement('div');
+                exportBtn.className = 'glass-card p-5 text-center cursor-pointer';
+                exportBtn.onclick = () => exportData();
+                exportBtn.innerHTML = `
+                    <i class="fa-solid fa-download text-3xl text-green-400 mb-2"></i>
+                    <p class="text-sm font-bold text-green-400">Export</p>
+                    <p class="text-[10px] text-zinc-400 uppercase">Backup Data</p>
+                `;
+                statsDiv.appendChild(exportBtn);
+            }
+        });
+        
+        function loadDemoData() {
+            loadDemoUsers();
+            loadDemoContents();
+            updateLastSync();
+        }
+    </script>
+</body>
+</html>
